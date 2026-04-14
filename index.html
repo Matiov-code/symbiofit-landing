@@ -644,23 +644,40 @@
   </footer>
 
   <script>
+    // Animation des points pendant le traitement n8n (OpenAI + Gmail)
+    function animateDots(btn) {
+      const states = ['Traitement en cours', 'Traitement en cours.', 'Traitement en cours..', 'Traitement en cours...'];
+      let i = 0;
+      return setInterval(() => {
+        btn.textContent = states[i % states.length];
+        i++;
+      }, 500);
+    }
+
     async function handleSubmit(e) {
       e.preventDefault();
       const form = e.target;
       const btn = form.querySelector('.btn-submit');
 
+      // Clés en accord avec le mapping n8n : $json.body['prénom'], $json.body['téléphone']
       const payload = {
-        prenom:  form.prenom.value.trim(),
-        nom:     form.nom.value.trim(),
-        club:    form.club.value.trim(),
-        email:   form.email.value.trim(),
-        tel:     form.tel.value.trim(),
-        role:    form.role.value,
-        message: form.message.value.trim(),
+        'prénom':     form.prenom.value.trim(),
+        'nom':        form.nom.value.trim(),
+        'club':       form.club.value.trim(),
+        'email':      form.email.value.trim(),
+        'téléphone':  form.tel.value.trim(),
+        'rôle':       form.role.value,
+        'message':    form.message.value.trim(),
       };
 
       btn.disabled = true;
       btn.textContent = 'Envoi en cours…';
+
+      // Lance l'animation d'attente après 1s (le temps que n8n traite OpenAI + Gmail)
+      const dotTimer = setTimeout(() => {
+        const interval = animateDots(btn);
+        btn._dotInterval = interval;
+      }, 1000);
 
       try {
         const res = await fetch('https://n8n-formation.isao.io/webhook/lead-capture', {
@@ -669,24 +686,95 @@
           body: JSON.stringify(payload),
         });
 
-        if (res.ok) {
+        clearTimeout(dotTimer);
+        clearInterval(btn._dotInterval);
+
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok && data.success === true) {
+          // Succès confirmé par le webhook n8n
           btn.textContent = '✓ Demande envoyée !';
           btn.style.background = '#22c55e';
+          btn.style.boxShadow = '0 8px 32px rgba(34,197,94,0.40)';
           form.reset();
+
+          // Affiche le message de confirmation sous le formulaire
+          showConfirmation(payload['prénom']);
+
           setTimeout(() => {
             btn.disabled = false;
             btn.textContent = 'Envoyer ma demande';
             btn.style.background = '';
-          }, 4000);
+            btn.style.boxShadow = '';
+          }, 6000);
         } else {
-          throw new Error('Réponse serveur : ' + res.status);
+          throw new Error('Réponse inattendue : ' + res.status);
         }
       } catch (err) {
+        clearTimeout(dotTimer);
+        clearInterval(btn._dotInterval);
         console.error(err);
         btn.disabled = false;
         btn.textContent = 'Envoyer ma demande';
-        alert('Une erreur est survenue. Veuillez réessayer ou nous contacter directement.');
+        showError();
       }
+    }
+
+    function showConfirmation(prenom) {
+      const existing = document.getElementById('form-feedback');
+      if (existing) existing.remove();
+
+      const el = document.createElement('div');
+      el.id = 'form-feedback';
+      el.style.cssText = `
+        margin-top: 20px;
+        padding: 16px 20px;
+        background: rgba(34,197,94,0.15);
+        border: 1px solid rgba(34,197,94,0.40);
+        border-radius: 10px;
+        color: #86efac;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        text-align: center;
+      `;
+      el.innerHTML = `
+        <strong style="display:block;margin-bottom:4px;font-size:1rem;">✓ Merci ${prenom || ''}&nbsp;!</strong>
+        Ta demande a bien été reçue. Un email de confirmation vient de t'être envoyé.
+        Mathieu reviendra vers toi très rapidement avec une réponse personnalisée.
+      `;
+
+      const formCard = document.querySelector('.form-card');
+      formCard.appendChild(el);
+
+      setTimeout(() => { if (el.parentNode) el.remove(); }, 10000);
+    }
+
+    function showError() {
+      const existing = document.getElementById('form-feedback');
+      if (existing) existing.remove();
+
+      const el = document.createElement('div');
+      el.id = 'form-feedback';
+      el.style.cssText = `
+        margin-top: 20px;
+        padding: 16px 20px;
+        background: rgba(239,68,68,0.15);
+        border: 1px solid rgba(239,68,68,0.40);
+        border-radius: 10px;
+        color: #fca5a5;
+        font-size: 0.9rem;
+        text-align: center;
+      `;
+      el.innerHTML = `
+        <strong style="display:block;margin-bottom:4px;">Une erreur est survenue</strong>
+        Merci de réessayer ou de nous contacter directement à
+        <a href="mailto:mathieu@yahoo.fr" style="color:#ff7733;">mathieu@yahoo.fr</a>
+      `;
+
+      const formCard = document.querySelector('.form-card');
+      formCard.appendChild(el);
+
+      setTimeout(() => { if (el.parentNode) el.remove(); }, 8000);
     }
   </script>
 </body>
