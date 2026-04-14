@@ -644,10 +644,49 @@
   </footer>
 
   <script>
-    function handleSubmit(e) {
+    async function handleSubmit(e) {
       e.preventDefault();
-      alert('Merci pour votre demande ! Nous vous contacterons très prochainement.');
-      e.target.reset();
+      const form = e.target;
+      const btn = form.querySelector('.btn-submit');
+
+      const payload = {
+        prenom:  form.prenom.value.trim(),
+        nom:     form.nom.value.trim(),
+        club:    form.club.value.trim(),
+        email:   form.email.value.trim(),
+        tel:     form.tel.value.trim(),
+        role:    form.role.value,
+        message: form.message.value.trim(),
+      };
+
+      btn.disabled = true;
+      btn.textContent = 'Envoi en cours…';
+
+      try {
+        const res = await fetch('https://n8n-formation.isao.io/webhook/lead-capture', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          btn.textContent = '✓ Demande envoyée !';
+          btn.style.background = '#22c55e';
+          form.reset();
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = 'Envoyer ma demande';
+            btn.style.background = '';
+          }, 4000);
+        } else {
+          throw new Error('Réponse serveur : ' + res.status);
+        }
+      } catch (err) {
+        console.error(err);
+        btn.disabled = false;
+        btn.textContent = 'Envoyer ma demande';
+        alert('Une erreur est survenue. Veuillez réessayer ou nous contacter directement.');
+      }
     }
   </script>
 </body>
